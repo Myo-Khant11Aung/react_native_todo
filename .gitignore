@@ -1,0 +1,10 @@
+# Go
+backend/.env
+backend/tmp/
+
+# Node
+frontend/todo_app/node_modules/
+frontend/todo_app/.expo/
+
+# General
+.DS_Store
