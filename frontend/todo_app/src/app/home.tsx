@@ -1,7 +1,9 @@
-import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, Text, View, Pressable, ScrollView } from "react-native";
 import { useState } from "react";
 import Checkbox from "expo-checkbox";
+import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 
 const todos = [
   {
@@ -118,10 +120,21 @@ const TodoItems = ({ todo }: { todo: Todo }) => {
 };
 
 export default function App() {
+  const handleLogout = async () => {
+    await SecureStore.deleteItemAsync("token");
+    router.replace("/");
+  };
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.title}>
         <Text style={styles.titleText}>To Do List</Text>
+        <Pressable
+          onPress={handleLogout}
+          style={{ backgroundColor: "#f0f0f0", padding: 8, borderRadius: 8 }}
+        >
+          <Text style={{ color: "black", fontWeight: "bold" }}>Logout</Text>
+        </Pressable>
       </View>
 
       <ScrollView style={styles.todolist}>
@@ -134,7 +147,7 @@ export default function App() {
           <Text style={{ color: "white", fontWeight: "bold" }}>Add Todo </Text>
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -148,9 +161,10 @@ const styles = StyleSheet.create({
     backgroundColor: "maroon",
     width: "100%",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     padding: 16,
     marginBottom: 8,
+    flexDirection: "row",
   },
   titleText: {
     fontSize: 24,

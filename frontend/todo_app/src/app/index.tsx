@@ -2,10 +2,50 @@ import { StyleSheet, Text, View, Pressable, TextInput } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as SecureStore from "expo-secure-store";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+
+    if (!email || !password) {
+      setError("All fields are required.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error);
+        setLoading(false);
+        return;
+      }
+
+      await SecureStore.setItemAsync("token", data.token);
+      router.replace("/home");
+    } catch (error) {
+      setError("An error occurred while logging in.");
+      setLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,8 +64,16 @@ export default function Login() {
           secureTextEntry
           style={styles.input}
         />
-        <Pressable style={styles.loginButton}>
-          <Text style={{ color: "white", fontWeight: "bold" }}>Login</Text>
+        {error ? <Text style={{ color: "red" }}>{error}</Text> : null}
+        <Pressable
+          style={[styles.loginButton, loading && { opacity: 0.6 }]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={{ color: "white", fontWeight: "bold" }}>
+            {" "}
+            {loading ? "Logging in..." : "Login"}
+          </Text>
         </Pressable>
         <Pressable onPress={() => router.push("/signup")}>
           <Text style={{ color: "blue", marginTop: 10 }}>

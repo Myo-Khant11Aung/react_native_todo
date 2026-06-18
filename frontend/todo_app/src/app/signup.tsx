@@ -1,12 +1,63 @@
-import { StyleSheet, Text, View, Pressable, TextInput } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  TextInput,
+  Alert,
+} from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as SecureStore from "expo-secure-store";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSignup = async () => {
+    console.log("Signup button clicked");
+    setLoading(true);
+    if (!email || !username || !password) {
+      setError("All fields are required.");
+      setLoading(false);
+      return;
+    }
+    try {
+      console.log("API URL:", process.env.EXPO_PUBLIC_API_URL);
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/auth/signup`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, username, password }),
+        },
+      );
+      const data = await response.json();
+      console.log("status:", response.status);
+      console.log("data:", data);
+
+      if (!response.ok) {
+        setError(data.error);
+        setLoading(false);
+        return;
+      }
+
+      await SecureStore.setItemAsync("token", data.token);
+      router.replace("/home");
+    } catch (err) {
+      console.log("catch error:", err);
+      setError("Network error. Is your server running?");
+      setLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -31,8 +82,15 @@ export default function Signup() {
           secureTextEntry
           style={styles.input}
         />
-        <Pressable style={styles.signupButton}>
-          <Text style={{ color: "white", fontWeight: "bold" }}>Sign Up</Text>
+        {error ? <Text style={{ color: "red" }}>{error}</Text> : null}
+        <Pressable
+          style={[styles.signupButton, loading && { opacity: 0.6 }]}
+          onPress={handleSignup}
+          disabled={loading}
+        >
+          <Text style={{ color: "white", fontWeight: "bold" }}>
+            {loading ? "Signing up..." : "Sign Up"}
+          </Text>
         </Pressable>
         <Pressable onPress={() => router.dismissTo("/")}>
           <Text style={{ color: "blue", marginTop: 10 }}>

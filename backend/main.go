@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/rs/cors"
 )
 
 func sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
@@ -23,7 +25,20 @@ func sendSuccessResponse(w http.ResponseWriter, statusCode int, data any) {
 func main() {
 	db := initDB()
 	defer db.Close()
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type", "Authorization"},
+	})
+	h := &Handler{db: db}
+
+	mux := http.NewServeMux()
+
+	// Auth routes
+	mux.HandleFunc("/auth/signup", h.SignUp)
+	mux.HandleFunc("/auth/login", h.Login)
+	handler := c.Handler(mux)
 
 	log.Println("Server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }
