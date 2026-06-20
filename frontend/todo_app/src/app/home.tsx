@@ -1,128 +1,149 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StyleSheet, Text, View, Pressable, ScrollView } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  ScrollView,
+  Alert,
+} from "react-native";
 import { useState } from "react";
 import Checkbox from "expo-checkbox";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { ActivityIndicator } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
-const todos = [
-  {
-    id: 1,
-    title: "Buy groceries",
-    description: "Milk, eggs, bread, and coffee",
-    dueDate: "2026-06-15",
-  },
-  {
-    id: 2,
-    title: "Fix login bug",
-    description: "Users are getting 401 on correct credentials",
-    dueDate: "2026-06-14",
-  },
-  {
-    id: 3,
-    title: "Call dentist",
-    description: "Schedule cleaning appointment",
-    dueDate: "2026-06-20",
-  },
-  {
-    id: 4,
-    title: "Review pull request",
-    description: "Check Myo's PR for the auth refactor",
-    dueDate: "2026-06-13",
-  },
-  {
-    id: 5,
-    title: "Pay electricity bill",
-    description: "Due by end of the month",
-    dueDate: "2026-06-30",
-  },
-  {
-    id: 6,
-    title: "Read Go documentation",
-    description: "Focus on net/http and middleware patterns",
-    dueDate: "2026-06-18",
-  },
-  {
-    id: 7,
-    title: "Grocery run",
-    description: "Pick up ingredients for dinner",
-    dueDate: "2026-06-14",
-  },
-  {
-    id: 8,
-    title: "Update resume",
-    description: "Add recent projects and skills",
-    dueDate: "2026-06-22",
-  },
-  {
-    id: 9,
-    title: "Team standup prep",
-    description: "Write up yesterday's progress and blockers",
-    dueDate: "2026-06-13",
-  },
-  {
-    id: 10,
-    title: "Set up Postgres locally",
-    description: "Create todo_app database and run migrations",
-    dueDate: "2026-06-14",
-  },
-  {
-    id: 11,
-    title: "Learn FlatList",
-    description: "Understand keyExtractor and renderItem",
-    dueDate: "2026-06-15",
-  },
-  {
-    id: 12,
-    title: "Book flight tickets",
-    description: "Check prices for July trip",
-    dueDate: "2026-06-25",
-  },
-  {
-    id: 13,
-    title: "Water the plants",
-    description: "They look sad",
-    dueDate: "2026-06-13",
-  },
-  {
-    id: 14,
-    title: "Write unit tests",
-    description: "Cover the auth middleware in Go",
-    dueDate: "2026-06-28",
-  },
-  {
-    id: 15,
-    title: "Clean up desk",
-    description: "It's getting out of hand",
-    dueDate: "2026-06-13",
-  },
-];
 type Todo = {
-  id: number;
+  todo_id: number;
   title: string;
   description: string;
-  dueDate: string;
+  due_date: string;
 };
 
-const TodoItems = ({ todo }: { todo: Todo }) => {
+const deleteTodo = async (todoID: number) => {
+  const token = await SecureStore.getItemAsync("token");
+  const response = await fetch(
+    `${process.env.EXPO_PUBLIC_API_URL}/deletetodo`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ todo_id: todoID }),
+    },
+  );
+  console.log("delete status:", response.status);
+  const data = await response.json();
+  console.log("delete data:", data);
+  if (!response.ok) {
+    throw new Error(data.error || "Could not delete todo");
+  }
+
+  return data;
+};
+
+const TodoItems = ({
+  todo,
+  onDelete,
+}: {
+  todo: Todo;
+  onDelete: (id: number) => void;
+}) => {
   const [isChecked, setIsChecked] = useState(false);
+
+  const handleCheck = (value: boolean) => {
+    setIsChecked(value);
+
+    setTimeout(() => {
+      Alert.alert("Delete Todo", `Are you done with "${todo.title}"?`, [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => setIsChecked(false),
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDelete(todo.todo_id),
+        },
+      ]);
+    }, 300); // 300ms delay
+  };
+
   return (
-    <View key={todo.id} style={styles.todoItem}>
+    <View style={styles.todoItem}>
       <Pressable
         style={{ flex: 1, padding: 8 }}
-        onPress={() => alert("Button clicked!")}
+        onPress={() =>
+          router.push({
+            pathname: "/todo_details",
+            params: {
+              todo_id: todo.todo_id,
+              title: todo.title,
+              description: todo.description,
+              due_date: todo.due_date,
+            },
+          })
+        }
       >
         <Text>{todo.title}</Text>
       </Pressable>
-      <Checkbox value={isChecked} onValueChange={setIsChecked}></Checkbox>
+      <Checkbox value={isChecked} onValueChange={handleCheck} />
     </View>
   );
 };
-
 export default function App() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync("token");
     router.replace("/");
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTodos = async () => {
+        setLoading(true);
+        const token = await SecureStore.getItemAsync("token");
+        try {
+          const response = await fetch(
+            `${process.env.EXPO_PUBLIC_API_URL}/gettodos`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+          if (!response.ok) {
+            setError("Could not load todos");
+            return;
+          }
+          const data = await response.json();
+          setTodos(data);
+        } catch (err) {
+          setError("Network Error");
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchTodos();
+    }, []),
+  );
+
+  const handleDelete = async (todoID: number) => {
+    try {
+      await deleteTodo(todoID);
+      setTodos((prev) => prev.filter((t) => t.todo_id !== todoID));
+    } catch (err) {
+      Alert.alert("Error", "Could not delete todo");
+    } finally {
+      Alert.alert("Todo deleted successfully");
+    }
   };
 
   return (
@@ -136,17 +157,34 @@ export default function App() {
           <Text style={{ color: "black", fontWeight: "bold" }}>Logout</Text>
         </Pressable>
       </View>
+      {error ? (
+        <View
+          style={{
+            padding: 16,
+            backgroundColor: "#ffe0e0",
+            width: "100%",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "red" }}>{error}</Text>
+        </View>
+      ) : null}
+      {loading ? (
+        <ActivityIndicator size="large" color="maroon" />
+      ) : (
+        <ScrollView style={styles.todolist}>
+          {todos.map((todo) => (
+            <TodoItems key={todo.todo_id} todo={todo} onDelete={handleDelete} />
+          ))}
+        </ScrollView>
+      )}
 
-      <ScrollView style={styles.todolist}>
-        {todos.map((todo) => (
-          <TodoItems key={todo.id} todo={todo} />
-        ))}
-      </ScrollView>
-      <View style={styles.addButton}>
-        <Pressable>
-          <Text style={{ color: "white", fontWeight: "bold" }}>Add Todo </Text>
-        </Pressable>
-      </View>
+      <Pressable
+        onPress={() => router.push("/add_todo")}
+        style={styles.addButton}
+      >
+        <Text style={{ color: "white", fontWeight: "bold" }}>Add Todo </Text>
+      </Pressable>
     </SafeAreaView>
   );
 }

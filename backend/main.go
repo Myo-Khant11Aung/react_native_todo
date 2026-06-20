@@ -21,7 +21,6 @@ func sendSuccessResponse(w http.ResponseWriter, statusCode int, data any) {
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(data)
 }
-
 func main() {
 	db := initDB()
 	defer db.Close()
@@ -37,6 +36,10 @@ func main() {
 	// Auth routes
 	mux.HandleFunc("/auth/signup", h.SignUp)
 	mux.HandleFunc("/auth/login", h.Login)
+	mux.HandleFunc("/gettodos", h.getTodos)
+	mux.HandleFunc("/addtodo", h.addTodos)
+	mux.HandleFunc("/deletetodo", h.deleteTodo)
+	mux.HandleFunc("/edittodo", h.editTodo)
 	handler := c.Handler(mux)
 
 	log.Println("Server running on :8080")

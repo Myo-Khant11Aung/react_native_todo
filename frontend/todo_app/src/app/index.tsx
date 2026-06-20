@@ -40,7 +40,7 @@ export default function Login() {
       await SecureStore.setItemAsync("token", data.token);
       router.replace("/home");
     } catch (error) {
-      setError("An error occurred while logging in.");
+      setError("Network error. Is your server running?");
       setLoading(false);
     } finally {
       setLoading(false);
